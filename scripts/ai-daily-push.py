@@ -40,16 +40,8 @@ def find_report(date_str):
     path = os.path.join(DAILY_REPORT_DIR, date_str, f"{date_str}-articles.json")
     return path if os.path.exists(path) else None
 
-def find_report_json(date_str):
-    path = os.path.join(DAILY_REPORT_DIR, date_str, f"{date_str}.json")
-    return path if os.path.exists(path) else None
-
 def is_ai_related(article):
     text = article.get('title', '') + ' ' + article.get('excerpt', '')
-    return any(kw in text for kw in AI_KEYWORDS)
-
-def is_ai_brief(brief):
-    text = brief.get('title', '') + ' ' + brief.get('summary', '')
     return any(kw in text for kw in AI_KEYWORDS)
 
 def score_article(article):
@@ -63,48 +55,46 @@ def score_article(article):
             score += 1
     return score
 
-def generate_summary(report_json_path, ai_articles):
-    """Generate a ~100 word English summary from the report's AI content."""
-    summaries = []
+def is_mostly_english(text):
+    """Check if text is mostly ASCII/English."""
+    if not text:
+        return False
+    ascii_chars = sum(1 for c in text if ord(c) < 128)
+    return ascii_chars / len(text) > 0.7
 
-    if report_json_path:
-        try:
-            with open(report_json_path, 'r', encoding='utf-8') as f:
-                report = json.load(f)
+def generate_summary(ai_articles):
+    """Build a ~100 word English summary from top articles."""
+    highlights = []
+    for a in ai_articles[:8]:
+        title = a.get('title', '').strip()
+        source = a.get('source', '')
+        excerpt = a.get('excerpt', '').strip()
 
-            for brief in report.get('tech_briefs', []):
-                if is_ai_brief(brief):
-                    s = brief.get('summary', '')
-                    if s:
-                        summaries.append(s)
+        if is_mostly_english(excerpt) and len(excerpt) > 30:
+            highlights.append(excerpt[:150])
+        elif is_mostly_english(title):
+            highlights.append(f"{title} ({source})")
+        else:
+            # Chinese title/excerpt — skip for English summary
+            continue
 
-            editor_note = report.get('editor_note', '')
-            if any(kw in editor_note for kw in AI_KEYWORDS):
-                summaries.append(editor_note)
-        except Exception:
-            pass
+    if not highlights:
+        return "Today's top AI news highlights."
 
-    if not summaries:
-        for a in ai_articles[:5]:
-            excerpt = a.get('excerpt', '')
-            if excerpt:
-                summaries.append(excerpt[:100])
-
-    combined = '; '.join(summaries)
+    combined = '; '.join(highlights[:5])
     if len(combined) > 600:
         combined = combined[:597] + '...'
-
-    return combined if combined else 'Today\'s top AI news highlights.'
+    return combined
 
 def generate_markdown(date_str, articles, summary):
     lines = [
         f"# 🤖 AI Daily — {date_str}",
         "",
-        f"## 📝 Summary",
+        "## 📝 Summary",
         "",
-        f"{summary}",
+        summary,
         "",
-        f"---",
+        "---",
         "",
         f"## 🔥 Top {TOP_N} AI News",
         "",
@@ -161,8 +151,6 @@ def main():
         print(f"NO_REPORT: No report found for {today} or {yesterday}")
         sys.exit(0)
 
-    report_json_path = find_report_json(date_used)
-
     with open(report_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -177,14 +165,14 @@ def main():
         print(f"NO_AI_NEWS: No AI-related articles found in {date_used}")
         sys.exit(0)
 
-    summary = generate_summary(report_json_path, top_articles)
+    summary = generate_summary(top_articles)
     md = generate_markdown(date_used, top_articles, summary)
     success = push_to_github(date_used, md)
 
     if success:
         print(f"SUCCESS: Pushed {len(top_articles)} AI articles for {date_used} to GitHub")
     else:
-        print(f"ERROR: Failed to push to GitHub", file=sys.stderr)
+        print("ERROR: Failed to push to GitHub", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == '__main__':
