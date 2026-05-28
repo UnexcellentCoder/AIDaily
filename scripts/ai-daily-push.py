@@ -287,7 +287,7 @@ def push_to_github(date_str, md_content):
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(md_content)
     cmds = [
-        ['git', 'add', f'dailyAIBrief/{date_str}.md'],
+        ['git', 'add', '-A'],
         ['git', 'commit', '-m', f'🤖 AI Daily {date_str}'],
         ['git', 'pull', '--rebase', 'origin', 'main'],
         ['git', 'push', 'origin', 'main'],
