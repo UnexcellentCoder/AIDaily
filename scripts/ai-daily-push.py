@@ -14,7 +14,8 @@ from datetime import datetime, timedelta
 # ─── Config ───
 REPORT_TZ = os.environ.get("REPORT_TZ", "Asia/Shanghai")
 DAILY_REPORT_DIR = os.path.expanduser("~/DailyBrief/daily_reports")
-REPO_DIR = os.path.expanduser("~/AIDaily/dailyAIBrief")
+GIT_DIR = os.path.expanduser("~/AIDaily")
+OUTPUT_DIR = os.path.expanduser("~/AIDaily/dailyAIBrief")
 TOP_N = 20
 
 # ─── MiniMax API ───
@@ -211,17 +212,17 @@ def generate_markdown(date_str, articles, day_summary, article_summaries):
     return '\n'.join(lines)
 
 def push_to_github(date_str, md_content):
-    file_path = os.path.join(REPO_DIR, f"{date_str}.md")
+    file_path = os.path.join(OUTPUT_DIR, f"{date_str}.md")
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(md_content)
 
     cmds = [
-        ['git', 'add', f'{date_str}.md'],
+        ['git', 'add', f'dailyAIBrief/{date_str}.md'],
         ['git', 'commit', '-m', f'🤖 AI Daily {date_str}'],
         ['git', 'push', 'origin', 'main'],
     ]
     for cmd in cmds:
-        result = subprocess.run(cmd, cwd=REPO_DIR, capture_output=True, text=True)
+        result = subprocess.run(cmd, cwd=GIT_DIR, capture_output=True, text=True)
         if result.returncode != 0 and 'nothing to commit' not in result.stderr:
             print(f"Error: {result.stderr}", file=sys.stderr)
             return False
