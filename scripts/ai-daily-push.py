@@ -299,12 +299,29 @@ def push_to_github(date_str, md_content):
             return False
     return True
 
+def wait_for_report(date_str, max_wait_min=20, interval_sec=60):
+    """Wait up to max_wait_min minutes for today's report to appear."""
+    import time
+    deadline = time.time() + max_wait_min * 60
+    while time.time() < deadline:
+        path = find_report(date_str)
+        if path:
+            return path
+        remaining = int((deadline - time.time()) / 60)
+        print(f"Waiting for {date_str} report... ({remaining}min left)", file=sys.stderr)
+        time.sleep(interval_sec)
+    return None
+
 def main():
     today = get_today_str()
     yesterday = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     report_path = find_report(today)
     date_used = today
     if not report_path:
+        print(f"Today's report ({today}) not ready, waiting up to 20min...", file=sys.stderr)
+        report_path = wait_for_report(today, max_wait_min=20)
+    if not report_path:
+        print(f"Still no report for {today}, falling back to {yesterday}", file=sys.stderr)
         report_path = find_report(yesterday)
         date_used = yesterday
     if not report_path:
